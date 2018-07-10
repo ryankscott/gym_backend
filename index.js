@@ -6,39 +6,38 @@ const FileSync = require("lowdb/adapters/FileSync");
 const adapter = new FileSync("db.json");
 const db = low(adapter);
 
-function saveClass(c) {
-  // TODO: Catch failures
+let saveEntity = (entity, c) => {
   db
-    .get("classes")
+    .get(entity)
     .push(c)
     .write();
-  return;
-}
+};
 
-function saveTrainers(c) {
-  // TODO: Catch failures
-  db
-    .get("trainers")
-    .push(c)
-    .write();
-  return;
-}
+saveEntity = _.curry(saveEntity);
+saveClass = saveEntity("classes");
+saveTrainers = saveEntity("trainers");
+saveClassType = saveEntity("classType");
 
-function parseClasses(jsonClasses) {
-  _.map(jsonClasses.Classes, saveClass);
-  _.map(jsonClasses.Trainers, saveTrainers);
-}
+const saveClasses = jsonClasses => {
+  let classes = _.get(jsonClasses, "Classes");
+  let trainers = _.get(jsonClasses, "Trainers");
+  let classType = _.get(jsonClasses, "ClassType");
+  _.map(classes, saveClass);
+  _.map(trainers, saveTrainers);
+  _.map(classType, saveClassType);
+};
 
-function GetClasses() {
+const getClasses = () => {
   fetch("https://www.lesmills.co.nz/api/timetable/get-timetable-epi", {
     method: "POST",
     body: "Club=01,09,13,06",
     headers: { "Content-Type": "application/x-www-form-urlencoded" }
   })
     .then(res => res.json())
-    .then(json => parseClasses(json))
+    .then(json => saveClasses(json))
     .catch(err => console.log(err));
   // TODO: Handle failures properly
-}
-db.defaults({ classes: [], trainers: [] }).write();
-GetClasses();
+};
+
+db.defaults({ classes: [], trainers: [], classType: [] }).write();
+getClasses();
