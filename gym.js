@@ -38,11 +38,11 @@ const queryClasses = query => {
     return queryAllClasses();
   }
 
-  let names = name.split(",");
+  let names = name ? name.split(",") : [];
   names = _.map(names, n => n.toLowerCase());
   classesByName = queryClassesByName(...names);
 
-  let clubs = club ? club.split(",") : club;
+  let clubs = club ? club.split(",") : [];
   clubs = _.map(clubs, c => c.toLowerCase());
   classesByClub = queryClassesByClub(...clubs);
 
