@@ -33,10 +33,6 @@ const queryClasses = query => {
   const club = _.get(query, "club");
   const before = _.get(query, "before");
   const after = _.get(query, "after");
-  // If we don't receive any of the required parameters, return all classes
-  if (_.isUndefined(name || club || before || after)) {
-    return queryAllClasses();
-  }
 
   let names = name ? name.split(",") : [];
   names = _.map(names, n => n.toLowerCase());
@@ -58,6 +54,9 @@ const queryAllClasses = () => {
 };
 
 const queryClassesByName = (...name) => {
+  if (name.length == 0) {
+    return queryAllClasses();
+  }
   return db
     .get("classes")
     .filter(c => {
@@ -82,6 +81,9 @@ const queryClassesByDate = (
 };
 
 const queryClassesByClub = (...club) => {
+  if (club.length == 0) {
+    return queryAllClasses();
+  }
   return db
     .get("classes")
     .filter(c => {
