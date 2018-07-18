@@ -1,3 +1,4 @@
+// @flow
 const fetch = require("node-fetch");
 const low = require("lowdb");
 const moment = require("moment");
@@ -7,19 +8,27 @@ const FileSync = require("lowdb/adapters/FileSync");
 const adapter = new FileSync("db.json");
 const db = low(adapter);
 
-let saveEntity = (entity, c) => {
+let saveEntityFunc = (entity, c: string) => {
   db
     .get(entity)
     .push(c)
     .write();
 };
 
-saveEntity = _.curry(saveEntity);
-saveClass = saveEntity("classes");
-saveTrainers = saveEntity("trainers");
-saveClassType = saveEntity("classType");
+let saveEntity = _.curry(saveEntityFunc);
+const saveClass = saveEntity("classes");
+const saveTrainers = saveEntity("trainers");
+const saveClassType = saveEntity("classType");
 
-const queryClasses = query => {
+const classFilter = inputClass => {
+  return {
+    Club: inputClass.Club,
+    ClubName: inputClass.ClubName,
+    StartDateTime: inputClass.StartDateTime
+  };
+};
+
+const queryClasses = (query: {}) => {
   /* Should expect an object that looks like
      *  {
      *     name: "BodyPump, RPM"
@@ -36,17 +45,22 @@ const queryClasses = query => {
 
   let names = name ? name.split(",") : [];
   names = _.map(names, n => n.toLowerCase());
-  classesByName = queryClassesByName(...names);
+  const classesByName = queryClassesByName(...names);
 
   let clubs = club ? club.split(",") : [];
   clubs = _.map(clubs, c => c.toLowerCase());
-  classesByClub = queryClassesByClub(...clubs);
+  const classesByClub = queryClassesByClub(...clubs);
 
   // Here be dragons - I assume this is in NZT!!
-  classesByDate = queryClassesByDate(before, after);
+  const classesByDate = queryClassesByDate(before, after);
 
-  allClasses = _.intersection(classesByName, classesByClub, classesByDate);
-  return allClasses;
+  const allClasses = _.intersection(
+    classesByName,
+    classesByClub,
+    classesByDate
+  );
+  const reducedClasses = _.map(allClasses, classFilter);
+  return reducedClasses;
 };
 
 const queryAllClasses = () => {
@@ -93,8 +107,7 @@ const queryClassesByClub = (...club) => {
 };
 
 const removeOldClasses = () => {
-  return;
-  db
+  return db
     .get("classes")
     .remove(c => {
       moment(c.StartDateTime).isBefore(moment().subtract(7, "days"));
