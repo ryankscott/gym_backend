@@ -8,7 +8,7 @@ var app = express();
 app.use(morgan("dev"));
 app.use(cors());
 
-app.get("/classes", (req, res: express$Response) => {
+app.get("/classes", (req, res) => {
   const queryString = req.query;
   const allClasses = queries.queryClasses(queryString);
   res.send(allClasses);

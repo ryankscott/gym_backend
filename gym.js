@@ -8,7 +8,7 @@ const FileSync = require("lowdb/adapters/FileSync");
 const adapter = new FileSync("db.json");
 const db = low(adapter);
 
-let saveEntityFunc = (entity, c: string) => {
+let saveEntityFunc = (entity, c) => {
   db
     .get(entity)
     .push(c)
@@ -23,12 +23,12 @@ const saveClassType = saveEntity("classType");
 const classFilter = inputClass => {
   return {
     Club: inputClass.Club,
-    ClubName: inputClass.ClubName,
+    ClassName: inputClass.ClassName,
     StartDateTime: inputClass.StartDateTime
   };
 };
 
-const queryClasses = (query: {}) => {
+const queryClasses = query => {
   /* Should expect an object that looks like
      *  {
      *     name: "BodyPump, RPM"
@@ -60,7 +60,7 @@ const queryClasses = (query: {}) => {
     classesByDate
   );
   const reducedClasses = _.map(allClasses, classFilter);
-  return reducedClasses;
+  return _.sortBy(reducedClasses, ["StartDateTime"]);
 };
 
 const queryAllClasses = () => {
@@ -138,6 +138,6 @@ const getClasses = () => {
 };
 
 db.defaults({ classes: [], trainers: [], classType: [] }).write();
-//getClasses();
+getClasses();
 
 module.exports.queryClasses = queryClasses;
