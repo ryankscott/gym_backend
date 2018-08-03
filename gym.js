@@ -194,11 +194,18 @@ const getClasses = () => {
   removeOldClasses();
 };
 
-db.defaults({ classes: [], trainers: [], classType: [] }).write();
-removeClasses();
-getClasses();
+const createTables = () => {
+  db.defaults({ classes: [], trainers: [], classType: [] }).write();
+};
 
-module.exports.queryClasses = queryClasses;
-module.exports.queryClassTypes = queryClassTypes;
-module.exports.getClasses = getClasses;
-module.exports.removeClasses = removeClasses;
+module.exports = {
+  saveClasses,
+  removeClasses,
+  removeOldClasses,
+  queryClasses,
+  queryClassesByName,
+  queryClassTypes,
+  getClasses,
+  removeClasses,
+  createTables
+};
