@@ -7,6 +7,7 @@ const path = require("path");
 const { logger } = require("./logger.js");
 const {
   createDB,
+  createDefaultTables,
   queryClasses,
   queryClassTypes,
   deleteClasses,
@@ -20,8 +21,10 @@ app.use(cors());
 app.use(express.static("build"));
 
 // Set up DB
+var db;
 db = createDB("db.json");
 createDefaultTables(db);
+getClasses(db);
 
 const DBRefreshInterval = 24 * 60 * 60 * 1000; // hours * minutes * seconds * ms
 setInterval(() => {

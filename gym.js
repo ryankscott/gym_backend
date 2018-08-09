@@ -5,6 +5,7 @@ const FileSync = require("lowdb/adapters/FileSync");
 const parse = require("date-fns/parse");
 const addDays = require("date-fns/addDays");
 const subDays = require("date-fns/subDays");
+const subHours = require("date-fns/subHours");
 const isBefore = require("date-fns/isBefore");
 const isAfter = require("date-fns/isAfter");
 const getHours = require("date-fns/getHours");
@@ -87,21 +88,21 @@ const queryClasses = (db, query) => {
 
   let names = name ? name.split(",") : [];
   names = _.map(names, n => n.toLowerCase());
-  const classesByName = queryClassesByName(...names);
+  const classesByName = queryClassesByName(db, ...names);
 
   let clubs = club ? club.split(",") : [];
   clubs = _.map(clubs, c => c.toLowerCase());
-  const classesByClub = queryClassesByClub(...clubs);
+  const classesByClub = queryClassesByClub(db, ...clubs);
 
   let dates = date ? date.split(",") : [];
-  const classesByDate = queryClassesByDate(...dates);
+  const classesByDate = queryClassesByDate(db, ...dates);
 
   // Here be dragons - I assume this is in NZT!!
   let hours = hour ? hour.split(",") : [];
   hours = _.map(hours, hour => {
     return parseInt(hour, 10);
   });
-  const classesByHour = queryClassesByHour(...hours);
+  const classesByHour = queryClassesByHour(db, ...hours);
 
   const allClasses = _.intersection(
     classesByName,
@@ -142,7 +143,7 @@ const queryClassesByDate = (db, ...dates) => {
 
 const queryClassesByHour = (db, ...hours) => {
   if (hours.length == 0) {
-    return queryAllClasses();
+    return queryAllClasses(db);
   }
 
   return db
@@ -155,7 +156,7 @@ const queryClassesByHour = (db, ...hours) => {
 
 const queryClassesByClub = (db, ...club) => {
   if (club.length == 0) {
-    return queryAllClasses();
+    return queryAllClasses(db);
   }
   return db
     .get("classes")
@@ -196,8 +197,8 @@ const deleteClasses = db => {
 const deleteOldClasses = db => {
   return db
     .get("classes")
-    .delete(c => {
-      moment(c.StartDateTime).isBefore(moment().subtract(7, "days"));
+    .remove(c => {
+      isBefore(c.StartDateTime, subHours(new Date(), 7));
     })
     .write();
 };
@@ -215,12 +216,12 @@ const getClasses = db => {
       const endTime = new Date();
       const duration = (endTime - startTime) / 1000;
       logger.log("info", "Fetched all classes in %d s", duration);
-      saveEntities(json);
+      saveEntities(db, json);
     })
 
     .catch(err => console.log(err));
 
-  deleteOldClasses();
+  deleteOldClasses(db);
 };
 
 const createDB = fileName => {
@@ -231,6 +232,7 @@ const createDB = fileName => {
 const createDefaultTables = db => {
   db.defaults({ classes: [], trainers: [], classType: [] }).write();
 };
+
 const deleteDB = db => {};
 
 module.exports = {
@@ -241,6 +243,7 @@ module.exports = {
   queryClassesByName,
   queryClassesByDate,
   queryClassesByHour,
+  queryClassesByClub,
   queryClassTypes,
   getClasses,
   deleteClasses,
