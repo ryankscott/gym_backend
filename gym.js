@@ -240,6 +240,7 @@ module.exports = {
   queryClasses,
   queryClassesByName,
   queryClassesByDate,
+  queryClassesByHour,
   queryClassTypes,
   getClasses,
   deleteClasses,
