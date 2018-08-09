@@ -4,6 +4,7 @@ const { splat, combine, timestamp, colorize, prettyPrint, printf } = format;
 // Logging
 const tsFormat = () => new Date().toLocaleTimeString();
 const logger = createLogger({
+  level: "error",
   transports: [
     new transports.Console({
       format: combine(

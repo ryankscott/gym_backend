@@ -28,7 +28,7 @@
     "flow-bin": "^0.76.0",
     "jest": "^23.4.2"
   },
-    "jest": {
+  "jest": {
     "verbose": true,
     "testURL": "http://localhost/"
   }

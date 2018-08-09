@@ -6,9 +6,10 @@ const path = require("path");
 
 const { logger } = require("./logger.js");
 const {
+  createDB,
   queryClasses,
   queryClassTypes,
-  removeClasses,
+  deleteClasses,
   getClasses
 } = require("./gym.js");
 
@@ -18,20 +19,24 @@ app.use(cors());
 
 app.use(express.static("build"));
 
+// Set up DB
+db = createDB("db.json");
+createDefaultTables(db);
+
 const DBRefreshInterval = 24 * 60 * 60 * 1000; // hours * minutes * seconds * ms
 setInterval(() => {
-  queries.removeClasses();
-  queries.getClasses();
+  deleteClasses(db);
+  getClasses(db);
 }, DBRefreshInterval);
 
 app.get("/classes", (req, res) => {
   const queryString = req.query;
-  const allClasses = queryClasses(queryString);
+  const allClasses = queryClasses(db, queryString);
   res.send(allClasses);
 });
 
 app.get("/classtypes", (req, res) => {
-  const allClassTypes = queryClassTypes();
+  const allClassTypes = queryClassTypes(db);
   res.send(allClassTypes);
 });
 

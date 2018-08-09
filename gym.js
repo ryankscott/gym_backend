@@ -8,23 +8,51 @@ const subDays = require("date-fns/subDays");
 const isBefore = require("date-fns/isBefore");
 const isAfter = require("date-fns/isAfter");
 const getHours = require("date-fns/getHours");
-const adapter = new FileSync("db.json");
 const isSameDay = require("date-fns/isSameDay");
-const db = low(adapter);
 
 const { logger } = require("./logger.js");
 
-let saveEntityFunc = (entity, c) => {
+const saveEntities = (db, jsonClasses) => {
+  let classes = _.get(jsonClasses, "Classes");
+  const startTime = new Date();
+  logger.log("info", "Saving %d classes", classes.length);
+  let trainers = _.get(jsonClasses, "Trainers");
+  let classType = _.get(jsonClasses, "ClassType");
+  _.map(classes, c => {
+    saveClasses(db, c);
+  });
+  _.map(trainers, t => {
+    saveTrainers(db, t);
+  });
+
+  _.map(classType, ct => {
+    saveClassType(db, ct);
+  });
+  const endTime = new Date();
+  const duration = (endTime - startTime) / 1000;
+  logger.log("info", "Saved all classes in %d s", duration);
+};
+
+const saveClasses = (db, c) => {
   db
-    .get(entity)
+    .get("classes")
     .push(c)
     .write();
 };
 
-let saveEntity = _.curry(saveEntityFunc);
-const saveClass = saveEntity("classes");
-const saveTrainers = saveEntity("trainers");
-const saveClassType = saveEntity("classType");
+const saveTrainers = (db, c) => {
+  db
+    .get("trainers")
+    .push(c)
+    .write();
+};
+
+const saveClassType = (db, c) => {
+  db
+    .get("classType")
+    .push(c)
+    .write();
+};
 
 const classFilter = inputClass => {
   return {
@@ -34,11 +62,15 @@ const classFilter = inputClass => {
   };
 };
 
-const queryClassTypes = () => {
+const queryAllClasses = db => {
+  return db.get("classes").value();
+};
+
+const queryClassTypes = db => {
   return db.get("classType").value();
 };
 
-const queryClasses = query => {
+const queryClasses = (db, query) => {
   /* Should expect an object that looks like
      *  {
      *     name: "BodyPump, RPM"
@@ -81,13 +113,9 @@ const queryClasses = query => {
   return _.sortBy(reducedClasses, ["StartDateTime"]);
 };
 
-const queryAllClasses = () => {
-  return db.get("classes").value();
-};
-
-const queryClassesByName = (...id) => {
+const queryClassesByName = (db, ...id) => {
   if (id.length == 0) {
-    return queryAllClasses();
+    return queryAllClasses(db);
   }
   return db
     .get("classes")
@@ -97,9 +125,9 @@ const queryClassesByName = (...id) => {
     .value();
 };
 
-const queryClassesByDate = (...dates) => {
+const queryClassesByDate = (db, ...dates) => {
   if (dates.length == 0) {
-    return queryAllClasses();
+    return queryAllClasses(db);
   }
   return db
     .get("classes")
@@ -112,7 +140,7 @@ const queryClassesByDate = (...dates) => {
     .value();
 };
 
-const queryClassesByHour = (...hours) => {
+const queryClassesByHour = (db, ...hours) => {
   if (hours.length == 0) {
     return queryAllClasses();
   }
@@ -125,7 +153,7 @@ const queryClassesByHour = (...hours) => {
     .value();
 };
 
-const queryClassesByClub = (...club) => {
+const queryClassesByClub = (db, ...club) => {
   if (club.length == 0) {
     return queryAllClasses();
   }
@@ -137,43 +165,44 @@ const queryClassesByClub = (...club) => {
     .value();
 };
 
-const removeClassTypes = () => {
+const deleteEntities = db => {
+  deleteClasses(db);
+  deleteClassTypes(db);
+  deleteTrainers(db);
+};
+
+const deleteTrainers = db => {
+  return db
+    .get("trainers")
+    .remove()
+    .write();
+};
+
+const deleteClassTypes = db => {
   return db
     .get("classType")
     .remove()
     .write();
 };
-const removeClasses = () => {
+
+const deleteClasses = db => {
   logger.log("info", "Removing all classes");
   return db
     .get("classes")
     .remove()
     .write();
 };
-const removeOldClasses = () => {
+
+const deleteOldClasses = db => {
   return db
     .get("classes")
-    .remove(c => {
+    .delete(c => {
       moment(c.StartDateTime).isBefore(moment().subtract(7, "days"));
     })
     .write();
 };
 
-const saveClasses = jsonClasses => {
-  let classes = _.get(jsonClasses, "Classes");
-  const startTime = new Date();
-  logger.log("info", "Saving %d classes", classes.length);
-  let trainers = _.get(jsonClasses, "Trainers");
-  let classType = _.get(jsonClasses, "ClassType");
-  _.map(classes, saveClass);
-  _.map(trainers, saveTrainers);
-  _.map(classType, saveClassType);
-  const endTime = new Date();
-  const duration = (endTime - startTime) / 1000;
-  logger.log("info", "Saved all classes in %d s", duration);
-};
-
-const getClasses = () => {
+const getClasses = db => {
   logger.log("info", "Fetching new classes");
   const startTime = new Date();
   fetch("https://www.lesmills.co.nz/api/timetable/get-timetable-epi", {
@@ -186,26 +215,35 @@ const getClasses = () => {
       const endTime = new Date();
       const duration = (endTime - startTime) / 1000;
       logger.log("info", "Fetched all classes in %d s", duration);
-      saveClasses(json);
+      saveEntities(json);
     })
 
     .catch(err => console.log(err));
 
-  removeOldClasses();
+  deleteOldClasses();
 };
 
-const createTables = () => {
+const createDB = fileName => {
+  const adapter = new FileSync(fileName);
+  return low(adapter);
+};
+
+const createDefaultTables = db => {
   db.defaults({ classes: [], trainers: [], classType: [] }).write();
 };
+const deleteDB = db => {};
 
 module.exports = {
-  saveClasses,
-  removeClasses,
-  removeOldClasses,
+  saveEntities,
+  deleteEntities,
+  deleteOldClasses,
   queryClasses,
   queryClassesByName,
+  queryClassesByDate,
   queryClassTypes,
   getClasses,
-  removeClasses,
-  createTables
+  deleteClasses,
+  createDefaultTables,
+  createDB,
+  deleteDB
 };
