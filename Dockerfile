@@ -15,5 +15,6 @@ RUN npm install
 COPY . .
 COPY build/ /build/
 
+ENV TZ="Pacific/Auckland"
 EXPOSE 3000 
-CMD [ "node", "app.js" ]
+CMD ["node", "app.js" ]

@@ -13,6 +13,8 @@ const isSameDay = require("date-fns/isSameDay");
 
 const { logger } = require("./logger.js");
 
+// TODO:
+
 const saveEntities = (db, jsonClasses) => {
   let classes = _.get(jsonClasses, "Classes");
   const startTime = new Date();
@@ -88,13 +90,16 @@ const queryClasses = (db, query) => {
 
   let names = name ? name.split(",") : [];
   names = _.map(names, n => n.toLowerCase());
+  logger.log("debug", "Parsed names query parameter as %s", names);
   const classesByName = queryClassesByName(db, ...names);
 
   let clubs = club ? club.split(",") : [];
   clubs = _.map(clubs, c => c.toLowerCase());
+  logger.log("debug", "Parsed clubs query parameter as %s", clubs);
   const classesByClub = queryClassesByClub(db, ...clubs);
 
   let dates = date ? date.split(",") : [];
+  logger.log("debug", "Parsed dates query parameter as %s", dates);
   const classesByDate = queryClassesByDate(db, ...dates);
 
   // Here be dragons - I assume this is in NZT!!
@@ -102,6 +107,7 @@ const queryClasses = (db, query) => {
   hours = _.map(hours, hour => {
     return parseInt(hour, 10);
   });
+  logger.log("debug", "Parsed hours query parameter as %s", hours);
   const classesByHour = queryClassesByHour(db, ...hours);
 
   const allClasses = _.intersection(
@@ -111,11 +117,15 @@ const queryClasses = (db, query) => {
     classesByHour
   );
   const reducedClasses = _.map(allClasses, classFilter);
-  return _.sortBy(reducedClasses, ["StartDateTime"]);
+  const removePastClasses = _.filter(reducedClasses, c => {
+    return isAfter(c.StartDateTime, new Date());
+  });
+  return _.sortBy(removePastClasses, ["StartDateTime"]);
 };
 
 const queryClassesByName = (db, ...id) => {
   if (id.length == 0) {
+    logger.log("debug", "Returning all classes as no names parameter passed");
     return queryAllClasses(db);
   }
   return db
@@ -128,6 +138,7 @@ const queryClassesByName = (db, ...id) => {
 
 const queryClassesByDate = (db, ...dates) => {
   if (dates.length == 0) {
+    logger.log("debug", "Returning all classes as no dates parameter passed");
     return queryAllClasses(db);
   }
   return db
@@ -143,6 +154,7 @@ const queryClassesByDate = (db, ...dates) => {
 
 const queryClassesByHour = (db, ...hours) => {
   if (hours.length == 0) {
+    logger.log("debug", "Returning all classes as no hours parameter passed");
     return queryAllClasses(db);
   }
 
@@ -156,6 +168,7 @@ const queryClassesByHour = (db, ...hours) => {
 
 const queryClassesByClub = (db, ...club) => {
   if (club.length == 0) {
+    logger.log("debug", "Returning all classes as no club parameter passed");
     return queryAllClasses(db);
   }
   return db
