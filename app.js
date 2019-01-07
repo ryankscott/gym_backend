@@ -1,3 +1,5 @@
+// @flow
+
 const express = require("express");
 const _ = require("lodash");
 const morgan = require("morgan");
@@ -21,8 +23,7 @@ app.use(cors());
 app.use(express.static("build"));
 
 // Set up DB
-var db;
-db = createDB("db.json");
+var db = createDB("db.json");
 createDefaultTables(db);
 getClasses(db);
 
@@ -35,6 +36,7 @@ setInterval(() => {
 app.get("/classes", (req, res) => {
   const queryString = req.query;
   const allClasses = queryClasses(db, queryString);
+  console.log(allClasses);
   res.send(allClasses);
 });
 

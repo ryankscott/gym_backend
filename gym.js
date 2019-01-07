@@ -1,3 +1,5 @@
+// @flow
+
 const fetch = require("node-fetch");
 const low = require("lowdb");
 const _ = require("lodash");
@@ -16,11 +18,16 @@ const { logger } = require("./logger.js");
 // TODO:
 
 const saveEntities = (db, jsonClasses) => {
-  let classes = _.get(jsonClasses, "Classes");
   const startTime = new Date();
+  let classes = _.get(jsonClasses, "Classes");
   logger.log("info", "Saving %d classes", classes.length);
+
   let trainers = _.get(jsonClasses, "Trainers");
-  let classType = _.get(jsonClasses, "ClassType");
+  logger.log("info", "Saving %d trainers", trainers.length);
+
+  let classTypes = _.get(jsonClasses, "ClassType");
+  logger.log("info", "Saving %d class types", classTypes.length);
+
   _.map(classes, c => {
     saveClasses(db, c);
   });
@@ -28,8 +35,8 @@ const saveEntities = (db, jsonClasses) => {
     saveTrainers(db, t);
   });
 
-  _.map(classType, ct => {
-    saveClassType(db, ct);
+  _.map(classTypes, ct => {
+    saveClassTypes(db, ct);
   });
   const endTime = new Date();
   const duration = (endTime - startTime) / 1000;
@@ -37,31 +44,48 @@ const saveEntities = (db, jsonClasses) => {
 };
 
 const saveClasses = (db, c) => {
-  db
-    .get("classes")
+  db.get("classes")
     .push(c)
     .write();
 };
 
 const saveTrainers = (db, c) => {
-  db
-    .get("trainers")
+  db.get("trainers")
     .push(c)
     .write();
 };
 
-const saveClassType = (db, c) => {
-  db
-    .get("classType")
+const saveClassTypes = (db, c) => {
+  db.get("classTypes")
     .push(c)
     .write();
 };
 
-const classFilter = inputClass => {
+const classTransformer = inputClass => {
   return {
-    Club: inputClass.Club,
-    ClassName: inputClass.ClassName,
-    StartDateTime: inputClass.StartDateTime
+    gym: {
+      key: inputClass.Club.ClubCode,
+      name: inputClass.Club.Name
+    },
+    class: {
+      key: inputClass.ClassCode,
+      name: inputClass.ClassName
+    },
+    duration: inputClass.Duration,
+    instructor: {
+      key: inputClass.MainInstructor.InstructorId,
+      name: inputClass.MainInstructor.Name
+    },
+    isVirtualClass: inputClass.IsVirtualClass,
+    intensity: inputClass.Intensity,
+    startDateTime: inputClass.StartDateTime
+  };
+};
+
+const classTypeTransformer = inputClassType => {
+  return {
+    key: inputClassType.Key,
+    name: inputClassType.Value
   };
 };
 
@@ -70,18 +94,20 @@ const queryAllClasses = db => {
 };
 
 const queryClassTypes = db => {
-  return db.get("classType").value();
+  const allClassTypes = db.get("classTypes").value();
+  const transformedClassTypes = _.map(allClassTypes, classTypeTransformer);
+  return transformedClassTypes;
 };
 
 const queryClasses = (db, query) => {
   /* Should expect an object that looks like
-     *  {
-     *     name: "BodyPump, RPM"
-     *     club: "Auckland City"
-     *     date: "2018-07-18T19:10:00Z12:00,2018-07-18T20:10:00Z12:00",
-     *     hour: "6,7,8,9,10" 
-     *  }
-     */
+   *  {
+   *     name: "BodyPump, RPM"
+   *     club: "Auckland City"
+   *     date: "2018-07-18T19:10:00Z12:00,2018-07-18T20:10:00Z12:00",
+   *     hour: "6,7,8,9,10"
+   *  }
+   */
 
   const name = _.get(query, "name");
   const club = _.get(query, "club");
@@ -92,15 +118,30 @@ const queryClasses = (db, query) => {
   names = _.map(names, n => n.toLowerCase());
   logger.log("debug", "Parsed names query parameter as %s", names);
   const classesByName = queryClassesByName(db, ...names);
+  logger.log(
+    "debug",
+    "Returned %d classes from name query",
+    classesByName.length
+  );
 
   let clubs = club ? club.split(",") : [];
   clubs = _.map(clubs, c => c.toLowerCase());
   logger.log("debug", "Parsed clubs query parameter as %s", clubs);
   const classesByClub = queryClassesByClub(db, ...clubs);
+  logger.log(
+    "debug",
+    "Returned %d classes from club query",
+    classesByClub.length
+  );
 
   let dates = date ? date.split(",") : [];
   logger.log("debug", "Parsed dates query parameter as %s", dates);
   const classesByDate = queryClassesByDate(db, ...dates);
+  logger.log(
+    "debug",
+    "Returned %d classes from date query",
+    classesByDate.length
+  );
 
   // Here be dragons - I assume this is in NZT!!
   let hours = hour ? hour.split(",") : [];
@@ -109,6 +150,11 @@ const queryClasses = (db, query) => {
   });
   logger.log("debug", "Parsed hours query parameter as %s", hours);
   const classesByHour = queryClassesByHour(db, ...hours);
+  logger.log(
+    "debug",
+    "Returned %d classes from hour query",
+    classesByHour.length
+  );
 
   const allClasses = _.intersection(
     classesByName,
@@ -116,11 +162,13 @@ const queryClasses = (db, query) => {
     classesByDate,
     classesByHour
   );
-  const reducedClasses = _.map(allClasses, classFilter);
-  const removePastClasses = _.filter(reducedClasses, c => {
-    return isAfter(c.StartDateTime, new Date());
+  logger.log("debug", "Returned %d combined classes", allClasses.length);
+
+  const transformedClasses = _.map(allClasses, classTransformer);
+  const recentClasses = _.filter(transformedClasses, c => {
+    return isAfter(c.startDateTime, new Date());
   });
-  return _.sortBy(removePastClasses, ["StartDateTime"]);
+  return _.sortBy(recentClasses, ["startDateTime"]);
 };
 
 const queryClassesByName = (db, ...id) => {
@@ -179,6 +227,15 @@ const queryClassesByClub = (db, ...club) => {
     .value();
 };
 
+const queryClassesByVirtual = (db, isVirtual) => {
+  return db
+    .get("classes")
+    .filter(c => {
+      return c.IsVirtualClass === isVirtual;
+    })
+    .value();
+};
+
 const deleteEntities = db => {
   deleteClasses(db);
   deleteClassTypes(db);
@@ -194,7 +251,7 @@ const deleteTrainers = db => {
 
 const deleteClassTypes = db => {
   return db
-    .get("classType")
+    .get("classTypes")
     .remove()
     .write();
 };
@@ -217,6 +274,10 @@ const deleteOldClasses = db => {
 };
 
 const getClasses = db => {
+  // First delete all class types
+  logger.log("info", "Deleting old class types");
+  deleteClassTypes(db);
+
   logger.log("info", "Fetching new classes");
   const startTime = new Date();
   fetch("https://www.lesmills.co.nz/api/timetable/get-timetable-epi", {
@@ -232,7 +293,7 @@ const getClasses = db => {
       saveEntities(db, json);
     })
 
-    .catch(err => console.log(err));
+    .catch(err => logger.log("err", "Failed to fetch classes from LM %s", err));
 
   deleteOldClasses(db);
 };
@@ -243,7 +304,7 @@ const createDB = fileName => {
 };
 
 const createDefaultTables = db => {
-  db.defaults({ classes: [], trainers: [], classType: [] }).write();
+  db.defaults({ classes: [], trainers: [], classTypes: [] }).write();
 };
 
 const deleteDB = db => {};
