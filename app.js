@@ -36,7 +36,6 @@ setInterval(() => {
 app.get("/classes", (req, res) => {
   const queryString = req.query;
   const allClasses = queryClasses(db, queryString);
-  console.log(allClasses);
   res.send(allClasses);
 });
 
